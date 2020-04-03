@@ -79,6 +79,7 @@
 #include <novatel_gps_driver/parsers/inspvax.h>
 #include <novatel_gps_driver/parsers/insstdev.h>
 #include <novatel_gps_driver/parsers/range.h>
+#include <novatel_gps_driver/parsers/rawimu.h>
 #include <novatel_gps_driver/parsers/time.h>
 #include <novatel_gps_driver/parsers/trackstat.h>
 
@@ -230,6 +231,12 @@ namespace novatel_gps_driver
        */
       void GetNovatelPositions(std::vector<novatel_gps_msgs::NovatelPositionPtr>& positions);
       /**
+       * @brief Provides any RAWIMU messages that have been received since the
+       * last time this was called.
+       * @param[out] imu_messages New RAWIMU messages.
+       */
+      void GetNovatelRawImu(std::vector<novatel_gps_msgs::NovatelRawImuPtr>& imu_messages);
+      /**
        * @brief Provides any BESTXYZ messages that have been received since the
        * last time this was called.
        * @param[out] positions New BESTXYZ messages.
@@ -253,6 +260,12 @@ namespace novatel_gps_driver
        * @param[out] range_messages New RANGE messages.
        */
       void GetRangeMessages(std::vector<novatel_gps_msgs::RangePtr>& range_messages);
+      /**
+       * @brief Provides any raw Imu messages that have been generated since the
+       * last time this was called.
+       * @param[out] imu_message New raw Imu messages.
+       */
+      void GetRawImuMessages(std::vector<sensor_msgs::ImuPtr>& imu_messages);
       /**
        * @brief Provides any TIME messages that have been received since the
        * last time this was called.
@@ -383,7 +396,13 @@ namespace novatel_gps_driver
        * @brief Processes any messages in our corrimudata & inspva queues in order to
        * generate Imu messages from them.
        */
-      void GenerateImuMessages();
+      void GenerateCorrImuDataMessages();
+
+      /**
+       * @brief Processes any messages in our rawimu & inspva queues in order to
+       * generate Imu messages from them.
+       */
+      void GenerateRawImuMessages();
 
       /**
        * @brief Converts a BinaryMessage object into a ROS message of the appropriate type
@@ -487,6 +506,7 @@ namespace novatel_gps_driver
       InspvaxParser inspvax_parser_;
       InsstdevParser insstdev_parser_;
       RangeParser range_parser_;
+      RawImuParser rawimu_parser_;
       TimeParser time_parser_;
       TrackstatParser trackstat_parser_;
 
@@ -501,6 +521,7 @@ namespace novatel_gps_driver
       boost::circular_buffer<novatel_gps_msgs::GprmcPtr> gprmc_msgs_;
       boost::circular_buffer<novatel_gps_msgs::Gprmc> gprmc_sync_buffer_;
       boost::circular_buffer<sensor_msgs::ImuPtr> imu_msgs_;
+      boost::circular_buffer<sensor_msgs::ImuPtr> imur_msgs_;
       boost::circular_buffer<novatel_gps_msgs::InscovPtr> inscov_msgs_;
       boost::circular_buffer<novatel_gps_msgs::InspvaPtr> inspva_msgs_;
       boost::circular_buffer<novatel_gps_msgs::InspvaxPtr> inspvax_msgs_;
@@ -513,12 +534,14 @@ namespace novatel_gps_driver
       boost::circular_buffer<novatel_gps_msgs::NovatelHeading2Ptr> heading2_msgs_;
       boost::circular_buffer<novatel_gps_msgs::NovatelDualAntennaHeadingPtr> dual_antenna_heading_msgs_;
       boost::circular_buffer<novatel_gps_msgs::RangePtr> range_msgs_;
+      boost::circular_buffer<novatel_gps_msgs::NovatelRawImuPtr> rawimu_msgs_;
       boost::circular_buffer<novatel_gps_msgs::TimePtr> time_msgs_;
       boost::circular_buffer<novatel_gps_msgs::TrackstatPtr> trackstat_msgs_;
 
       // IMU data synchronization queues
       std::queue<novatel_gps_msgs::NovatelCorrectedImuDataPtr> corrimudata_queue_;
       std::queue<novatel_gps_msgs::InspvaPtr> inspva_queue_;
+      std::queue<novatel_gps_msgs::NovatelRawImuPtr> rawimu_queue_;
       novatel_gps_msgs::InsstdevPtr latest_insstdev_;
       novatel_gps_msgs::InscovPtr latest_inscov_;
       double imu_rate_;

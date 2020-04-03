@@ -27,35 +27,30 @@
 //
 // *****************************************************************************
 
-#ifndef NOVATEL_GPS_DRIVER_GPRMC_H
-#define NOVATEL_GPS_DRIVER_GPRMC_H
+#ifndef NOVATEL_GPS_DRIVER_RAWIMU_H
+#define NOVATEL_GPS_DRIVER_RAWIMU_H
 
 #include <novatel_gps_driver/parsers/message_parser.h>
-#include <novatel_gps_msgs/Gprmc.h>
+#include <novatel_gps_msgs/NovatelRawImu.h>
 
 namespace novatel_gps_driver
 {
-  class GprmcParser : public MessageParser<novatel_gps_msgs::GprmcPtr>
+  class RawImuParser : public MessageParser<novatel_gps_msgs::NovatelRawImuPtr>
   {
   public:
-    GprmcParser() : MessageParser<novatel_gps_msgs::GprmcPtr>(),
-                    was_last_gps_valid_(false)
-    {}
-
     uint32_t GetMessageId() const override;
 
     const std::string GetMessageName() const override;
 
-    novatel_gps_msgs::GprmcPtr ParseAscii(const NmeaSentence& sentence) noexcept(false) override;
+    novatel_gps_msgs::NovatelRawImuPtr ParseBinary(const BinaryMessage& bin_msg) noexcept(false) override;
 
-    bool WasLastGpsValid() const;
+    novatel_gps_msgs::NovatelRawImuPtr ParseAscii(const NovatelSentence& sentence) noexcept(false) override;
 
+    static constexpr uint16_t MESSAGE_ID = 268;
+    static constexpr size_t BINARY_LENGTH = 40;
+    static constexpr size_t ASCII_FIELDS = 9;
     static const std::string MESSAGE_NAME;
-    static constexpr double KNOTS_TO_MPS = 0.5144444;
-
-  private:
-    bool was_last_gps_valid_;
   };
 }
 
-#endif //NOVATEL_GPS_DRIVER_GPRMC_H
+#endif //NOVATEL_GPS_DRIVER_CORRIMUDATA_H

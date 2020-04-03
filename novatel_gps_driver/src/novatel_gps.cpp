@@ -63,6 +63,7 @@ namespace novatel_gps_driver
       gprmc_msgs_(MAX_BUFFER_SIZE),
       gprmc_sync_buffer_(SYNC_BUFFER_SIZE),
       imu_msgs_(MAX_BUFFER_SIZE),
+      imur_msgs_(MAX_BUFFER_SIZE),
       inscov_msgs_(MAX_BUFFER_SIZE),
       inspva_msgs_(MAX_BUFFER_SIZE),
       inspvax_msgs_(MAX_BUFFER_SIZE),
@@ -75,6 +76,7 @@ namespace novatel_gps_driver
       heading2_msgs_(MAX_BUFFER_SIZE),
       dual_antenna_heading_msgs_(MAX_BUFFER_SIZE),
       range_msgs_(MAX_BUFFER_SIZE),
+      rawimu_msgs_(MAX_BUFFER_SIZE),
       time_msgs_(MAX_BUFFER_SIZE),
       trackstat_msgs_(MAX_BUFFER_SIZE),
       imu_rate_(-1.0),
@@ -476,6 +478,13 @@ namespace novatel_gps_driver
     imu_messages.clear();
     imu_messages.insert(imu_messages.end(), corrimudata_msgs_.begin(), corrimudata_msgs_.end());
     corrimudata_msgs_.clear();
+  }
+
+  void NovatelGps::GetNovatelRawImu(std::vector<novatel_gps_msgs::NovatelRawImuPtr>& imu_messages)
+  {
+    imu_messages.clear();
+    imu_messages.insert(imu_messages.end(), rawimu_msgs_.begin(), rawimu_msgs_.end());
+    rawimu_msgs_.clear();
   }
 
   void NovatelGps::GetGpggaMessages(std::vector<novatel_gps_msgs::GpggaPtr>& gpgga_messages)
@@ -931,7 +940,7 @@ namespace novatel_gps_driver
     imu_msgs_.clear();
   }
 
-  void NovatelGps::GenerateImuMessages()
+  void NovatelGps::GenerateCorrImuDataMessages()
   {
     if (imu_rate_ <= 0.0)
     {
@@ -955,7 +964,7 @@ namespace novatel_gps_driver
       double corrimudata_time = corrimudata->gps_week_num * SECONDS_PER_WEEK + corrimudata->gps_seconds;
       double inspva_time = inspva->novatel_msg_header.gps_week_num *
                                SECONDS_PER_WEEK + inspva->novatel_msg_header.gps_seconds;
-
+      
       if (std::fabs(corrimudata_time - inspva_time) > IMU_TOLERANCE_S)
       {
         // If the two messages are too far apart to sync, discard the oldest one.
@@ -1015,11 +1024,71 @@ namespace novatel_gps_driver
       imu->linear_acceleration_covariance[0] =
       imu->linear_acceleration_covariance[4] =
       imu->linear_acceleration_covariance[8] = 1e-3;
-
       imu_msgs_.push_back(imu);
     }
 
     size_t new_size = imu_msgs_.size() - previous_size;
+    ROS_DEBUG("Created %lu new sensor_msgs/Imu messages.", new_size);
+  }
+
+  void NovatelGps::GetRawImuMessages(std::vector<sensor_msgs::ImuPtr>& imu_messages)
+  {
+    imu_messages.clear();
+    imu_messages.insert(imu_messages.end(), imur_msgs_.begin(), imur_msgs_.end());
+    imur_msgs_.clear();
+  }
+  
+  void NovatelGps::GenerateRawImuMessages()
+  {
+    double gyro_scale = (0.008/65536)/125/8.0178*9.805;
+    double accel_scale = (0.200/65536)/125/8.0178*9.805;
+
+    if (imu_rate_ <= 0.0)
+    {
+      ROS_WARN_ONCE("IMU rate has not been configured; cannot produce sensor_msgs/Imu messages.");
+      return;
+    }
+
+    size_t previous_size = imur_msgs_.size();
+    // Only do anything if we have both RAWIMU and INSPVA messages.
+    while (!rawimu_queue_.empty())
+    {
+      novatel_gps_msgs::NovatelRawImuPtr rawimu = rawimu_queue_.front();
+
+      double rawimu_time = rawimu->gps_week_num * SECONDS_PER_WEEK + rawimu->gps_seconds;
+
+      rawimu_queue_.pop();
+      
+      // Now we can combine them together to make an Imu message.
+      sensor_msgs::ImuPtr imur = boost::make_shared<sensor_msgs::Imu>();
+
+      imur->header.stamp = rawimu->header.stamp;
+      
+      imur->orientation = tf::createQuaternionMsgFromRollPitchYaw(0, 0, 0);
+      
+      for (int i=0; i<9; ++i)
+      {
+        imur->orientation_covariance[i] = -1;
+      }
+
+      imur->angular_velocity.x = rawimu->pitch_rate * gyro_scale;
+      imur->angular_velocity.y = rawimu->roll_rate * gyro_scale * -1;
+      imur->angular_velocity.z = rawimu->yaw_rate * gyro_scale;
+      imur->angular_velocity_covariance[0] =
+      imur->angular_velocity_covariance[4] =
+      imur->angular_velocity_covariance[8] = 1e-3;
+
+      imur->linear_acceleration.x = rawimu->x_acceleration * accel_scale;
+      imur->linear_acceleration.y = rawimu->y_acceleration * accel_scale * -1;
+      imur->linear_acceleration.z = rawimu->z_acceleration * accel_scale;
+      imur->linear_acceleration_covariance[0] =
+      imur->linear_acceleration_covariance[4] =
+      imur->linear_acceleration_covariance[8] = 1e-3;
+
+      imur_msgs_.push_back(imur);
+    }
+
+    size_t new_size = imur_msgs_.size() - previous_size;
     ROS_DEBUG("Created %lu new sensor_msgs/Imu messages.", new_size);
   }
 
@@ -1075,7 +1144,7 @@ namespace novatel_gps_driver
       }
       case Heading2Parser::MESSAGE_ID:
       {
-	novatel_gps_msgs::NovatelHeading2Ptr heading = heading2_parser_.ParseBinary(msg);
+	      novatel_gps_msgs::NovatelHeading2Ptr heading = heading2_parser_.ParseBinary(msg);
         heading->header.stamp = stamp;
         heading2_msgs_.push_back(heading);
         break;
@@ -1098,7 +1167,7 @@ namespace novatel_gps_driver
           ROS_WARN_THROTTLE(1.0, "CORRIMUDATA queue overflow.");
           corrimudata_queue_.pop();
         }
-        GenerateImuMessages();
+        GenerateCorrImuDataMessages();
         break;
       }
       case InscovParser::MESSAGE_ID:
@@ -1120,7 +1189,8 @@ namespace novatel_gps_driver
           ROS_WARN_THROTTLE(1.0, "INSPVA queue overflow.");
           inspva_queue_.pop();
         }
-        GenerateImuMessages();
+        GenerateCorrImuDataMessages();
+        GenerateRawImuMessages();
         break;
       }
       case InspvaxParser::MESSAGE_ID:
@@ -1143,6 +1213,20 @@ namespace novatel_gps_driver
         novatel_gps_msgs::RangePtr range = range_parser_.ParseBinary(msg);
         range->header.stamp = stamp;
         range_msgs_.push_back(range);
+        break;
+      }
+      case RawImuParser::MESSAGE_ID:
+      {
+        novatel_gps_msgs::NovatelRawImuPtr imu = rawimu_parser_.ParseBinary(msg);
+        imu->header.stamp = stamp;
+        rawimu_msgs_.push_back(imu);
+        rawimu_queue_.push(imu);
+        if (rawimu_queue_.size() > MAX_BUFFER_SIZE)
+        {
+          ROS_WARN_THROTTLE(1.0, "RAWIMU queue overflow.");
+          rawimu_queue_.pop();
+        }
+        GenerateRawImuMessages();
         break;
       }
       case TimeParser::MESSAGE_ID:
@@ -1299,7 +1383,7 @@ namespace novatel_gps_driver
         ROS_WARN_THROTTLE(1.0, "CORRIMUDATA queue overflow.");
         corrimudata_queue_.pop();
       }
-      GenerateImuMessages();
+      GenerateCorrImuDataMessages();
     }
     else if (sentence.id == "INSCOVA")
     {
@@ -1319,7 +1403,8 @@ namespace novatel_gps_driver
         ROS_WARN_THROTTLE(1.0, "INSPVA queue overflow.");
         inspva_queue_.pop();
       }
-      GenerateImuMessages();
+      GenerateCorrImuDataMessages();
+      GenerateRawImuMessages();
     }
     else if (sentence.id == "INSPVAXA")
     {
@@ -1347,6 +1432,19 @@ namespace novatel_gps_driver
       novatel_gps_msgs::RangePtr range = range_parser_.ParseAscii(sentence);
       range->header.stamp = stamp;
       range_msgs_.push_back(range);
+    }
+    else if (sentence.id == "RAWIMUA")
+    {
+      novatel_gps_msgs::NovatelRawImuPtr imu = rawimu_parser_.ParseAscii(sentence);
+      imu->header.stamp = stamp;
+      rawimu_msgs_.push_back(imu);
+      rawimu_queue_.push(imu);
+      if (rawimu_queue_.size() > MAX_BUFFER_SIZE)
+      {
+        ROS_WARN_THROTTLE(1.0, "RAWIMU queue overflow.");
+        rawimu_queue_.pop();
+      }
+      GenerateRawImuMessages();
     }
     else if (sentence.id == "TRACKSTATA")
     {

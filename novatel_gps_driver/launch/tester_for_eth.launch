@@ -6,15 +6,20 @@
     <rosparam>
       verbose: true
       connection_type: tcp
-      device: 192.168.74.10:2000
-      imu_sample_rate: -1
+      device: 192.168.1.210:3003
+      imu_rate: 20
+      imu_sample_rate: 20
+      polling_period: 0.1
       use_binary_messages: true
-      publish_novatel_positions: true
+      publish_novatel_positions: false
+      publish_diagnostics: false
+      publish_sync_diagnostic: true
+      publish_time_messages: false
       publish_imu_messages: true
-      publish_imu: true
-      publish_novatel_velocity: true
+      publish_novatel_velocity: false
       imu_frame_id: /imu
-      publish_nmea_messages: true
+      publish_nmea_messages: false
+      publish_novatel_utm_positions: true
       frame_id: /gps
     </rosparam>
   </node>
