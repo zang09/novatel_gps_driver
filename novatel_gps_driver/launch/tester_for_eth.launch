@@ -7,8 +7,8 @@
       verbose: true
       connection_type: tcp
       device: 192.168.1.210:3003
-      imu_rate: 20
-      imu_sample_rate: 20
+      imu_rate: 100
+      imu_sample_rate: 100
       polling_period: 0.1
       use_binary_messages: true
       publish_novatel_positions: false
@@ -17,10 +17,12 @@
       publish_time_messages: false
       publish_imu_messages: true
       publish_novatel_velocity: false
-      imu_frame_id: /imu
+      imu_frame_id: imu_link
+      
       publish_nmea_messages: false
       publish_novatel_utm_positions: true
-      frame_id: /gps
+      publish_novatel_xyz_positions: true
+      frame_id: navsat_link
     </rosparam>
   </node>
 </launch>
