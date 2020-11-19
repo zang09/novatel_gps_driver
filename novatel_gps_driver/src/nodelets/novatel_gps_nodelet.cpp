@@ -176,6 +176,7 @@ class NovatelGpsNodelet : public nodelet::Nodelet
 public:
   bool log_flag_ = false;
   bool save_flag_ = true;
+  int  gps_status_ = 0;
 
 public:
   NovatelGpsNodelet() :
@@ -280,7 +281,7 @@ public:
 
     std::string gps_topic = node.resolveName("gps");
     gps_pub_ = swri::advertise<gps_common::GPSFix>(node, gps_topic, 100);
-    fix_pub_ = swri::advertise<sensor_msgs::NavSatFix>(node, "fix", 100);
+    fix_pub_ = swri::advertise<sensor_msgs::NavSatFix>(node, "gps/fix", 100);
 
     if (publish_clock_steering_)
     {
@@ -304,10 +305,10 @@ public:
       rawimu_pub_ = swri::advertise<sensor_msgs::Imu>(node, "imu/rawdata", 100);
       novatel_imu_pub_= swri::advertise<novatel_gps_msgs::NovatelCorrectedImuData>(node, "corrimudata", 100);
       novatel_rawimu_pub_= swri::advertise<novatel_gps_msgs::NovatelRawImu>(node, "rawimu", 100);
-      insstdev_pub_ = swri::advertise<novatel_gps_msgs::Insstdev>(node, "insstdev", 100);
-      inspva_pub_ = swri::advertise<novatel_gps_msgs::Inspva>(node, "inspva", 100);
-      inspvax_pub_ = swri::advertise<novatel_gps_msgs::Inspvax>(node, "inspvax", 100);
-      inscov_pub_ = swri::advertise<novatel_gps_msgs::Inscov>(node, "inscov", 100);
+//      insstdev_pub_ = swri::advertise<novatel_gps_msgs::Insstdev>(node, "insstdev", 100);
+//      inspva_pub_ = swri::advertise<novatel_gps_msgs::Inspva>(node, "inspva", 100);
+//      inspvax_pub_ = swri::advertise<novatel_gps_msgs::Inspvax>(node, "inspvax", 100);
+//      inscov_pub_ = swri::advertise<novatel_gps_msgs::Inscov>(node, "inscov", 100);
     }
 
     if (publish_gpgsv_)
@@ -953,6 +954,11 @@ private:
       {
         msg->header.stamp += sync_offset;
         msg->header.frame_id = frame_id_;
+
+        double accuracy = sqrt(pow(msg->northing_sigma,2)+pow(msg->easting_sigma,2));
+        if(accuracy < 1.0) gps_status_ = 1;
+        else gps_status_ = -1;
+
         novatel_utm_pub_.publish(msg);
       }
     }
@@ -1112,8 +1118,9 @@ private:
 
     for (const auto& msg : fix_msgs)
     {
-      msg->header.stamp += sync_offset;
+      msg->header.stamp = ros::Time::now(); //temp
       msg->header.frame_id = frame_id_;
+      msg->status.status = (short)gps_status_;
       gps_pub_.publish(msg);
 
       if (fix_pub_.getNumSubscribers() > 0)
