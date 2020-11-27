@@ -176,7 +176,7 @@ class NovatelGpsNodelet : public nodelet::Nodelet
 public:
   bool log_flag_ = false;
   bool save_flag_ = true;
-  int  gps_status_ = 0;
+  int  gps_service_ = 0;
 
 public:
   NovatelGpsNodelet() :
@@ -956,8 +956,8 @@ private:
         msg->header.frame_id = frame_id_;
 
         double accuracy = sqrt(pow(msg->northing_sigma,2)+pow(msg->easting_sigma,2));
-        if(accuracy < 1.0) gps_status_ = 1;
-        else gps_status_ = -1;
+        if(accuracy < 1.0) gps_service_ = 1;
+        else gps_service_ = 0;
 
         novatel_utm_pub_.publish(msg);
       }
@@ -1120,13 +1120,12 @@ private:
     {
       msg->header.stamp = ros::Time::now(); //temp
       msg->header.frame_id = frame_id_;
-      msg->status.status = (short)gps_status_;
       gps_pub_.publish(msg);
 
       if (fix_pub_.getNumSubscribers() > 0)
       {
-        sensor_msgs::NavSatFixPtr fix_msg = ConvertGpsFixToNavSatFix(msg);
-
+        sensor_msgs::NavSatFixPtr fix_msg = ConvertGpsFixToNavSatFix(msg);        
+        fix_msg->status.service = (unsigned short)gps_service_;
         fix_pub_.publish(fix_msg);
 
         // If the time between GPS message stamps is greater than 1.5s
