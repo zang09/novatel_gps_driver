@@ -1085,7 +1085,7 @@ private:
       {
         msg->header.stamp += sync_offset;
         msg->header.frame_id = imu_frame_id_;
-        inscov_pub_.publish(msg);
+        //inscov_pub_.publish(msg);
       }
 
       std::vector<novatel_gps_msgs::InspvaPtr> inspva_msgs;
@@ -1094,7 +1094,7 @@ private:
       {
         msg->header.stamp += sync_offset;
         msg->header.frame_id = imu_frame_id_;
-        inspva_pub_.publish(msg);
+        //inspva_pub_.publish(msg);
       }
 
       std::vector<novatel_gps_msgs::InspvaxPtr> inspvax_msgs;
@@ -1103,7 +1103,7 @@ private:
       {
         msg->header.stamp += sync_offset;
         msg->header.frame_id = imu_frame_id_;
-        inspvax_pub_.publish(msg);
+        //inspvax_pub_.publish(msg);
       }
 
       std::vector<novatel_gps_msgs::InsstdevPtr> insstdev_msgs;
@@ -1112,7 +1112,7 @@ private:
       {
         msg->header.stamp += sync_offset;
         msg->header.frame_id = imu_frame_id_;
-        insstdev_pub_.publish(msg);
+        //insstdev_pub_.publish(msg);
       }
     }
 
